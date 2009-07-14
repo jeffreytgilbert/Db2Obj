@@ -1,0 +1,3 @@
+Purpose of this utility is to quickly take basic or advanced (eventually) scripts from mysql (or SQLite or whatever eventually) and turn them into PHP Value Objects and Accessor Objects with dumb CRUD methods (or whatever language you want eventually) so I don't have to rely on other massively bloated frameworks I don't want to use for building my applications. Eventually, abstractions will be used for different languages and SQL formats but a simple functional release in PHP is all I'm personally concerned with at the moment.
+
+-- Jeff
