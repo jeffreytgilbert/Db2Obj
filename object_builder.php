@@ -1,5 +1,9 @@
 <?php
 
+/*
+ * @TODO There is a bug with handling composite key sets or UNIQUE(`id`,`name`,`pass`); << only gets id, ignores the rest due to comma exploding way early on.
+ */
+
 class Table{
 	public $table_name;
 	public $primary_keys=array();
@@ -42,22 +46,23 @@ class Column{
 	}
 }
 
-
 abstract class SQL2Obj{
-	protected $_sql_file = '';
-	protected $_file_buffer = '';
+	protected $_sql_file;
+	protected $_file_buffer;
 	protected $_db = array();
 	
 	public function __construct($sql_file){
-		$_sql_file = $sql_file;
-		$_file_buffer = file_get_contents($sql_file);
+		$this->_sql_file = $sql_file;
+		$this->_file_buffer = file_get_contents($sql_file);
 	}
+	
+	public function db(){ return $this->_db; }
 	
 	public abstract function parseToDataObj();
 }
 
 abstract class Obj2Files{
-	protected $_file_buffer = '';
+	protected $_file_buffer;
 	protected $_dbObj;
 	public function __construct(SQL2Obj $DataObject){
 		$_dbObj = $DataObject;
@@ -223,8 +228,9 @@ class Obj2PHP extends Obj2Files{
 	}
 }
 
-$DB2PHP = new Obj2PHP( new MySQL2Obj('example.sql') );
-
-$DB2PHP->convert();
+$DbObj = new MySQL2Obj('example.sql');
+$DbObj->parseToDataObj();
+$PHPObj = new Obj2PHP( $DbObj );
+$PHPObj->convert();
 
 //write out files based on foreach of $db structure;
