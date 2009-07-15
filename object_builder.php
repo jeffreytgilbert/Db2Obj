@@ -5,13 +5,17 @@
  */
 
 class Table{
-	public $table_name;
+	public $name;
 	public $primary_keys=array();
 	public $foreign_keys=array();
 	public $possible_foreign_keys=array();
 	public $index_keys=array();
 	public $unique_keys=array();
 	public $columns=array();
+	
+	public function __construct($table=array()){
+		foreach($table as $property => $value){ $this->$property = $value; }
+	}
 	
 	public function toString(){
 		return print_r($this->toArray(),true);
@@ -23,7 +27,7 @@ class Table{
 }
 
 class Column{
-	public $column_name;
+	public $name;
 	public $type;
 	public $size;
 	public $default; // nice to have -- unused
@@ -36,6 +40,10 @@ class Column{
 	public $fulltext = false;
 	public $auto_increment = false;
 	public $comments = '';
+	
+	public function __construct($column=array()){
+		foreach($column as $property => $value){ $this->$property = $value; }
+	}
 	
 	public function toString(){
 		return print_r($this->toArray(),true);
@@ -63,10 +71,12 @@ abstract class SQL2Obj{
 
 abstract class Obj2Files{
 	protected $_file_buffer;
-	protected $_dbObj;
+	protected $_dbo;
 	public function __construct(SQL2Obj $DataObject){
-		$_dbObj = $DataObject;
+		$this->_dbo = $DataObject;
 	}
+	
+	public function db(){ return $this->_dbo->db(); }
 	public abstract function convert();
 	protected function saveToFiles(){
 		
@@ -94,10 +104,10 @@ class MySQL2Obj extends SQL2Obj{
 			trim($table);
 			
 			preg_match('/`(.*?)`/', $table, $matches);
-			$TableDef->table_name = trim($matches[1]);
+			$TableDef->name = trim($matches[1]);
 			unset($matches);
 			
-			$column_pieces = explode('`'.$TableDef->table_name.'`', $table);
+			$column_pieces = explode('`'.$TableDef->name.'`', $table);
 			$table_columns = $column_pieces[1];
 			
 			$columns = explode(',', $table_columns);
@@ -145,14 +155,14 @@ class MySQL2Obj extends SQL2Obj{
 					// thank you mr gregory
 					preg_match_all('/`([a-zA-Z0-9_]+)`[\s]*([\w]+)[\s]*\(*[\s]*([0-9]*)[\s]*\)*[\s]+([^,]+)./', $column, $matches);
 					// $matches[0]; // bunk as always
-					$Col->column_name = $matches[1][0];
+					$Col->name = $matches[1][0];
 					$Col->type = $matches[2][0];
 					$Col->size = (isset($matches[3][0]) && !empty($matches[3][0]))?(int)$matches[3][0]:null;
 					$column = ' '.trim($matches[4][0]).' ';
 					unset($matches);
 					
-					if(substr($Col->column_name,-3) == '_id'){
-						$TableDef->possible_foreign_keys[] = $Col->column_name;
+					if(substr($Col->name,-3) == '_id'){
+						$TableDef->possible_foreign_keys[] = $Col->name;
 					}
 					
 					// match for binary, unsigned, or unsigned zerofill for attributes
@@ -174,15 +184,15 @@ class MySQL2Obj extends SQL2Obj{
 					// match primary, unique, index, or fulltext for index
 					if(stripos($column,' primary')){
 						$Col->primary = true;
-						$TableDef->primary_keys[] = $Col->column_name;
+						$TableDef->primary_keys[] = $Col->name;
 					} else if(stripos($column,' unique')){
 						$Col->unique = true;
-						$TableDef->unique_keys[] = $Col->column_name;
+						$TableDef->unique_keys[] = $Col->name;
 					} else if(stripos($column,' fulltext')){
 						$Col->fulltext = true;
 					} else if(stripos($column,' index')){
 						$Col->index = true;
-						$TableDef->index_keys[] = $Col->column_name;
+						$TableDef->index_keys[] = $Col->name;
 					}
 							
 					// match auto_increment for itself
@@ -198,7 +208,7 @@ class MySQL2Obj extends SQL2Obj{
 					$Col->extra = $column;
 					if(trim($column) == '') echo $original_column;
 					
-					$TableDef->columns[$Col->column_name] = $Col;
+					$TableDef->columns[$Col->name] = $Col;
 				}
 				
 				foreach($TableDef->possible_foreign_keys as $fk_guess){
@@ -217,10 +227,40 @@ class MySQL2Obj extends SQL2Obj{
 class Obj2PHP extends Obj2Files{
 	public function convert(){
 		// do stuff to make buffer
-		foreach($this->_dbObj as $table){
-			foreach($table->columns as $column){
-				$column->column_name;
+		foreach($this->db() as $Table){
+			$vo_buffer = '<?php
+class '.$Table->name.' {
+	
+	private $_data;
+	
+	public function __construct($array=array()) {
+		if(isset($array)){
+			$_data = $array;
+		}
+	}
+	
+';
+			
+			foreach($Table->columns as $Column){
+				$vo_buffer .= ''
+.($Column->primary?"\t// PRIMARY KEY\n":'')
+.(in_array($Column->name, $Table->foreign_keys)?"\t// FOREIGN KEY\n":'')
+.($Column->unique?"\t// UNIQUE\n":'')
+.($Column->fulltext?"\t// FULLTEXT\n":'')
+.($Column->index?"\t// INDEX\n":'')
+.'	private $_'.$Column->name.';
+	public function '.$Column->name.'($value = null){
+		if(isset($value)){ $_'.$Column->name.' = $_data[\''.$Column->name.'\'] = $value; }
+		else { return $_'.$Column->name.'; }
+	}
+	
+';
 			}
+			$vo_buffer .= ''
+.'	
+}
+';
+			echo $vo_buffer;
 		}
 		// save out to file
 		// repeat until done
