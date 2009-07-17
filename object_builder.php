@@ -78,8 +78,13 @@ abstract class Obj2Files{
 	
 	public function db(){ return $this->_dbo->db(); }
 	public abstract function convert();
-	protected function saveToFiles(){
-		
+	public abstract function createVO($Table);
+	public abstract function createAO($Table);
+	public function saveFile($name, $path, $contents){
+		if(!is_dir(dirname(__FILE__).'/'.$path)){
+			mkdir(dirname(__FILE__).'/'.$path, 0777, true);
+		}
+		file_put_contents(dirname(__FILE__).'/'.$path.'/'.$name, $contents);
 	}
 }
 
@@ -149,12 +154,17 @@ class MySQL2Obj extends SQL2Obj{
 						}
 					}
 				} else {
+					$original_column = $column;
 					// do appropriate stuff
-					$original_column = $column = preg_replace('/.*?`(.*?)/', '`$1', $column,1);
+					$column = preg_replace('/.*?`(.*?)/', '`$1', $column,1);
 					
 					// thank you mr gregory
 					preg_match_all('/`([a-zA-Z0-9_]+)`[\s]*([\w]+)[\s]*\(*[\s]*([0-9]*)[\s]*\)*[\s]+([^,]+)./', $column, $matches);
-					// $matches[0]; // bunk as always
+					
+					if(!isset($matches[1][0])){
+						print_r($original_column);
+						continue;
+					}
 					$Col->name = $matches[1][0];
 					$Col->type = $matches[2][0];
 					$Col->size = (isset($matches[3][0]) && !empty($matches[3][0]))?(int)$matches[3][0]:null;
@@ -202,11 +212,11 @@ class MySQL2Obj extends SQL2Obj{
 					
 					// match COMMENT '*' for comments
 					preg_match('/\'(.*?)\'/', $column, $matches);
-					$Col->comments = trim($matches[1]);
+					$Col->comments = isset($matches[1])?trim($matches[1]):null;
 					unset($matches);
 					
 					$Col->extra = $column;
-					if(trim($column) == '') echo $original_column;
+					if(trim($column) == '') echo "Failed: ".$original_column."\n";
 					
 					$TableDef->columns[$Col->name] = $Col;
 				}
@@ -228,21 +238,34 @@ class Obj2PHP extends Obj2Files{
 	public function convert(){
 		// do stuff to make buffer
 		foreach($this->db() as $Table){
-			$vo_buffer = '<?php
+			$this->saveFile($Table->name.'.php', 'models/VO', $this->createVO($Table));
+			$this->saveFile($Table->name.'.php', 'models/AO', $this->createAO($Table));
+		}
+		
+		// save out to file
+		// repeat until done
+	}
+	
+	public function createVO($Table){
+			$buffer = '<?php
 class '.$Table->name.' {
 	
-	private $_data;
+	public function __construct($table=array()){
+		foreach($table as $property => $value){ $this->$property = $value; }
+	}
 	
-	public function __construct($array=array()) {
-		if(isset($array)){
-			$_data = $array;
-		}
+	public function toString(){
+		return print_r($this->toArray(),true);
+	}
+	
+	public function toArray(){
+		return get_object_vars($this);
 	}
 	
 ';
 			
 			foreach($Table->columns as $Column){
-				$vo_buffer .= ''
+				$buffer .= ''
 .($Column->primary?"\t// PRIMARY KEY\n":'')
 .(in_array($Column->name, $Table->foreign_keys)?"\t// FOREIGN KEY\n":'')
 .($Column->unique?"\t// UNIQUE\n":'')
@@ -250,21 +273,72 @@ class '.$Table->name.' {
 .($Column->index?"\t// INDEX\n":'')
 .'	private $_'.$Column->name.';
 	public function '.$Column->name.'($value = null){
-		if(isset($value)){ $_'.$Column->name.' = $_data[\''.$Column->name.'\'] = $value; }
+		if(isset($value)){ $_'.$Column->name.' = $value; }
 		else { return $_'.$Column->name.'; }
 	}
 	
 ';
 			}
-			$vo_buffer .= ''
+			$buffer .= ''
 .'	
 }
 ';
-			echo $vo_buffer;
+		return $buffer;
+	}
+	
+	public function createAO($Table){
+		
+		$columns = array();
+		foreach($Table->columns as $Column){
+			$columns[] = $Column->name.'=@'.$Column->name;
+			$column_names[] = $Column->name;
 		}
-		// save out to file
-		// repeat until done
-		$this->saveToFiles();
+		$escaped_fields = implode(', ',$columns);
+		
+		$columns = array();
+		if(count($Table->primary_keys)>0){
+			foreach($Table->primary_keys as $column_name){
+				// woefully inefficient but for what it's doing, doesn't matter
+				foreach($Table->columns as $Column){
+					if($column_name == $Column->name){
+						$columns[] = $Column->name.'=@'.$Column->name;
+					}
+				}
+			}
+			$escaped_primary_fields = implode(' AND ',$columns);
+		}else{
+			$escaped_primary_fields = 1;
+		}
+		
+		$buffer = '<?php
+class '.$Table->name.'{
+	private static $instance;
+	
+	public static function getInstance(){
+	    if(!self::$instance){ self::$instance = new '.$Table->name.'(); }
+	    return self::$instance;
+	}
+	
+	private function __construct() {}
+
+	public function getTableContent() {
+		$sql = \'SELECT * FROM '.$Table->name.';\';
+	}
+	
+	public function updateRow( '.$Table->name.' $row ) {
+		$sql = \'UPDATE '.$Table->name.' SET '.$escaped_fields.' WHERE '.$escaped_primary_fields.'\';
+	}
+	
+	public function insertRow( '.$Table->name.' $row ) {
+		$sql = \'INSERT INTO '.$Table->name.'('.implode(', ',$column_names).') VALUES (@'.implode(', @',$column_names).')\';
+	}
+	
+	public function deleteRow( '.$Table->name.' $row ) {
+		$sql = \'DELETE FROM '.$Table->name.' WHERE '.$escaped_primary_fields.'\';
+	}
+	
+}';
+		return $buffer;
 	}
 }
 
@@ -272,5 +346,7 @@ $DbObj = new MySQL2Obj('example.sql');
 $DbObj->parseToDataObj();
 $PHPObj = new Obj2PHP( $DbObj );
 $PHPObj->convert();
+
+echo "Done writing files\n";
 
 //write out files based on foreach of $db structure;
