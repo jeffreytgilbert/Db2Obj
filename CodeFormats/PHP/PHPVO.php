@@ -12,7 +12,7 @@ final class '.$this->Table->name.' {
 	'.$this->toArray().'
 ';
 		foreach($this->Table->columns as $Column){
-			$buffer .= $this->getter($Column);
+			$buffer .= $this->value($Column);
 		}
 		$buffer .= '
 }
@@ -21,7 +21,7 @@ final class '.$this->Table->name.' {
 	}
 	
 	// unused. hate the getter setter syntax in php.
-	protected function getter(Column $Column){
+	protected function value(Column $Column){
 		return ''
 .($Column->primary?"\t// PRIMARY KEY\n":'')
 .(in_array($Column->name, $this->Table->foreign_keys)?"\t// FOREIGN KEY\n":'')
@@ -33,13 +33,10 @@ final class '.$this->Table->name.' {
 ';
 	}
 	
-	// unused
-	protected function setter(Column $Column){}
-	
 	protected function constructor(){
 		return '
-	public function __construct($table=array()){
-		foreach($table as $property => $value){ $this->$property = $value; }
+	public function __construct($Table=array()){ // an array of name value pairs to convert into this object commonly used from query results or remote api data
+		foreach($Table as $property => $value){ $this->$property = $value; }
 	}';
 	}
 	

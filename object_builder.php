@@ -9,7 +9,8 @@ require_once( dirname(__FILE__).'/Db2Obj/Db2Obj.php' );
 // Load Storage Engine Drivers
 require_once( dirname(__FILE__).'/DataTypes/MySQL/MySQL2Obj.php' );
 // Load Language Drivers
-require_once( dirname(__FILE__).'/CodeFormats/PHP/Obj2PHP.php' );
+//require_once( dirname(__FILE__).'/CodeFormats/PHP/Obj2PHP.php' );
+require_once( dirname(__FILE__).'/CodeFormats/AS3/Obj2AS3.php' );
 
 
 $DbObj = new MySQL2Obj('example.sql');

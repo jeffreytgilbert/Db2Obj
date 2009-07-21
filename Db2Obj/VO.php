@@ -16,8 +16,7 @@ abstract class VO{
 	 * though not required, you'll have to make the function anyway so while you're there why not add the 
 	 * functionality unless the language doesn't support it in which case, whatever... php you old cuss! get with the times!
 	 */
-	protected abstract function getter(Column $Column);
-	protected abstract function setter(Column $Column);
+	protected abstract function value(Column $Column);
 	protected abstract function constructor();
 	protected abstract function toString();
 	protected abstract function toArray();
