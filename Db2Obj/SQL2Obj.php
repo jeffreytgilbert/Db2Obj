@@ -12,5 +12,14 @@ abstract class SQL2Obj{
 	
 	public function db(){ return $this->_db; }
 	
+	public function convertToStandardSizeArray($size){
+		if(isset($size) && !empty($size)){
+			$size_array = explode(',',$size);
+			if(count($size_array) == 2) return $size_array;
+			else if(count($size_array) == 1) { $size_array[1]=null; return $size_array; }
+		}
+		return array(null,null);
+	}
+	
 	public abstract function parseToDataObj();
 }

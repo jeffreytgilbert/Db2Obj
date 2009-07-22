@@ -3,7 +3,23 @@
 require_once( dirname(__FILE__).'/../../Db2Obj/SQL2Obj.php' );
 
 class SQLite32Obj extends SQL2Obj{
-
+	
+	public function convertToStandardType($type){
+		switch(strtolower($type)){
+			case 'integer': return 'integer';
+			case 'char':
+			case 'varchar':
+			case 'text': return 'string';
+			case 'blob': // is clob supported? i forget. when i get online i'll make this extensive
+			case 'binary': return 'binary';
+			case 'number':
+			case 'float': return ''; // what goes to what?
+			case 'decimal': return ''; // what goes to what?
+			case 'double': return ''; // what goes to what?
+			case 'boolean': return 'boolean';
+		}
+	}
+	
 	public function parseToDataObj(){
 		$file_buffer = strtolower($this->_file_buffer);
 		
@@ -73,8 +89,9 @@ class SQLite32Obj extends SQL2Obj{
 						continue;
 					}
 					$Col->name = $matches[1][0];
-					$Col->type = $matches[2][0];
-					$Col->size = (isset($matches[3][0]) && !empty($matches[3][0]))?(int)$matches[3][0]:null;
+					$Col->setType( $this->convertToStandardType($matches[2][0]) );
+					$size_array = $this->convertToStandardSizeArray($matches[3][0]);
+					$Col->setSize( $size_array[0], $size_array[1] );
 					$column = ' '.trim($matches[4][0]).' ';
 					unset($matches);
 					
@@ -84,18 +101,18 @@ class SQLite32Obj extends SQL2Obj{
 					
 					// match for binary, unsigned, or unsigned zerofill for attributes
 					if(stripos($column,'unsigned zerofill')){
-						$Col->attributes = 'unsigned zerofill';
-					} else if(stripos($column,'unsigned')){
-						$Col->attributes = 'unsigned';
+						$Col->setAttributes('unsigned zerofill');
+					} else if(stripos($column,'')){
+						$Col->setAttributes('unsigned');
 					} else if(stripos($column,'binary')){
-						$Col->attributes = 'binary';
+						$Col->setAttributes('binary');
 					}
-					
+										
 					// match "null" or "not null" and define the nullable attribute
 					if(stripos($column,'not null')){
-						$Col->nullable = 'not null';
+						$Col->nullable = false;
 					} else {
-						$Col->nullable = 'null';
+						$Col->nullable = true;
 					}
 							
 					// match primary, unique, index, or fulltext for index

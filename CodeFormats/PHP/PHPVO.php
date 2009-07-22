@@ -7,9 +7,13 @@ class PHPVO extends VO{
 	public function build(){
 		$buffer = '<?php
 final class '.$this->Table->name.' {
+
 	'.$this->constructor().'
+	
 	'.$this->toString().'
+	
 	'.$this->toArray().'
+	
 ';
 		foreach($this->Table->columns as $Column){
 			$buffer .= $this->value($Column);
