@@ -98,6 +98,7 @@ class MySQL2Obj extends SQL2Obj{
 					}
 				} else {
 					$original_column = $column;
+
 					// do appropriate stuff
 					$column = preg_replace('/.*?`(.*?)/', '`$1', $column,1);
 					
@@ -108,6 +109,7 @@ class MySQL2Obj extends SQL2Obj{
 						print_r($original_column);
 						continue;
 					}
+					
 					$Col->name = $matches[1][0];
 					$Col->setType( $this->convertToStandardType($matches[2][0]) );
 					$size_array = $this->convertToStandardSizeArray($matches[3][0]);
@@ -160,6 +162,7 @@ class MySQL2Obj extends SQL2Obj{
 					unset($matches);
 					
 					$Col->extra = $column;
+					// Look at this part
 					if(trim($column) == '') echo "Failed: ".$original_column."\n";
 					
 					$TableDef->columns[$Col->name] = $Col;
